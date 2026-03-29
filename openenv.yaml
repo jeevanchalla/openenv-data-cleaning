@@ -1,0 +1,71 @@
+name: data-cleaning-env
+version: "1.0.0"
+description: >
+  A real-world data cleaning environment where an AI agent must identify
+  and fix data quality issues including null values, duplicates, type errors,
+  and formatting inconsistencies across tabular datasets.
+
+author: openenv-submission
+license: MIT
+
+tags:
+  - openenv
+  - data-cleaning
+  - real-world
+  - tabular
+
+tasks:
+  - id: task_easy
+    description: Remove duplicates and fill missing age values with mean
+    difficulty: easy
+    max_steps: 20
+    reward_range: [0.0, 1.0]
+
+  - id: task_medium
+    description: Fix nulls, convert types, remove duplicates, normalize country column
+    difficulty: medium
+    max_steps: 20
+    reward_range: [0.0, 1.0]
+
+  - id: task_hard
+    description: Multi-step HR dataset cleaning with date normalization, null removal, deduplication
+    difficulty: hard
+    max_steps: 20
+    reward_range: [0.0, 1.0]
+
+observation_space:
+  type: object
+  fields:
+    task_id: string
+    task_description: string
+    dataset: array
+    step_number: integer
+    max_steps: integer
+    last_action: string
+    last_action_error: string
+    progress: float
+
+action_space:
+  type: object
+  fields:
+    action_type:
+      type: string
+      enum: [fix_nulls, fix_types, remove_duplicates, normalize, remove_rows, done]
+    column:
+      type: string
+      optional: true
+    method:
+      type: string
+      optional: true
+    value:
+      type: any
+      optional: true
+
+endpoints:
+  reset: POST /reset
+  step:  POST /step
+  state: GET  /state
+
+server:
+  host: 0.0.0.0
+  port: 7860
