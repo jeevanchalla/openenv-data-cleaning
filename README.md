@@ -1,3 +1,12 @@
+---
+title: Openenv Data Cleaning
+emoji: 📚
+colorFrom: gray
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
 # 🧹 OpenEnv — Data Cleaning Environment
 
 An [OpenEnv](https://github.com/openenv)-compliant environment where an AI agent learns to clean real-world tabular datasets by identifying and fixing data quality issues.
@@ -147,7 +156,7 @@ GET  /tasks                         → list all task IDs
 
 ## 📊 Baseline Scores
 
-Run with `gpt-4-turbo` at `temperature=0.2`:
+Run with `gpt-4o-mini` at `temperature=0.2`:
 
 | Task | Score |
 |---|---|
@@ -164,7 +173,7 @@ Run with `gpt-4-turbo` at `temperature=0.2`:
 |---|---|
 | `OPENAI_API_KEY` | Your OpenAI API key |
 | `API_BASE_URL` | LLM API base URL (default: `https://api.openai.com/v1`) |
-| `MODEL_NAME` | Model to use (default: `gpt-4-turbo`) |
+| `MODEL_NAME` | Model to use (default: `gpt-4o-mini`) |
 | `HF_TOKEN` | Alias for API key on Hugging Face Spaces |
 
 ---
@@ -181,3 +190,5 @@ openenv validate
 ## 📄 License
 
 MIT
+
+Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
