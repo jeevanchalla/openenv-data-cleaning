@@ -1,7 +1,11 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+# Ensure the project root (/app) is on sys.path so `environment` is importable
+# regardless of how uvicorn launches this module.
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _root not in sys.path:
+    sys.path.insert(0, _root)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
