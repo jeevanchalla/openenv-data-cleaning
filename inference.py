@@ -6,6 +6,7 @@ Uses gpt-4-turbo via OpenAI client to run an agent against all 3 tasks.
 import json
 import os
 import sys
+import traceback
 
 from openai import OpenAI
 
@@ -24,11 +25,22 @@ FALLBACK_ACTION = json.dumps({"action_type": "done"})
 # ── import env directly (no HTTP server needed for inference) ─────────────────
 
 sys.path.insert(0, os.path.dirname(__file__))
-from environment.env import DataCleaningEnv
-from environment.models import Action
-from environment.tasks import list_tasks
 
-client = OpenAI(api_key=OPENAI_API_KEY, base_url=API_BASE_URL)
+try:
+    from environment.env import DataCleaningEnv
+    from environment.models import Action
+    from environment.tasks import list_tasks
+except ImportError as exc:
+    print(f"ERROR: Failed to import environment modules: {exc}")
+    traceback.print_exc()
+    sys.exit(1)
+
+try:
+    client = OpenAI(api_key=OPENAI_API_KEY, base_url=API_BASE_URL)
+except Exception as exc:
+    print(f"ERROR: Failed to initialize OpenAI client: {exc}")
+    traceback.print_exc()
+    sys.exit(1)
 
 # ── prompts ───────────────────────────────────────────────────────────────────
 
@@ -97,12 +109,24 @@ def run_task(task_id: str) -> float:
     print(f"  Task: {task_id}")
     print(f"{'='*60}")
 
-    env = DataCleaningEnv(task_id=task_id)
-    obs_obj = env.reset()
-    obs = obs_obj.model_dump()
+    try:
+        env = DataCleaningEnv(task_id=task_id)
+    except Exception as exc:
+        print(f"  ERROR: Failed to initialize environment for {task_id}: {exc}")
+        traceback.print_exc()
+        return 0.0
+    
+    try:
+        obs_obj = env.reset()
+        obs = obs_obj.model_dump()
+    except Exception as exc:
+        print(f"  ERROR: Failed to reset environment: {exc}")
+        traceback.print_exc()
+        return 0.0
 
     total_reward = 0.0
     final_score  = 0.0
+    info = {}  # Initialize to avoid UnboundLocalError at end of function
 
     for step in range(1, MAX_STEPS + 1):
         user_content = build_user_prompt(obs)
@@ -126,10 +150,18 @@ def run_task(task_id: str) -> float:
         print(f"  Step {step:02d}: {action.action_type}"
               + (f" | col={action.column} method={action.method}" if action.column else ""))
 
-        obs_obj, reward, done, info = env.step(action)
-        obs = obs_obj.model_dump()
-        total_reward += reward
-        final_score   = info["grader"]["score"]
+        try:
+            obs_obj, reward, done, info = env.step(action)
+            obs = obs_obj.model_dump()
+            total_reward += reward
+            final_score   = info["grader"]["score"]
+        except Exception as exc:
+            print(f"  [Step {step}] Environment error: {exc}")
+            traceback.print_exc()
+            # Continue to next step or gracefully degrade
+            info = info or {}
+            done = True
+            break
 
         print(f"          reward={reward:+.4f} | score={final_score:.4f} | done={done}")
         if obs.get("last_action_error"):
@@ -140,31 +172,50 @@ def run_task(task_id: str) -> float:
 
     print(f"\n  Final score : {final_score:.4f}")
     print(f"  Total reward: {total_reward:+.4f}")
-    print(f"  Grader detail: {info['grader']['message']}")
+    if info and "grader" in info:
+        print(f"  Grader detail: {info['grader'].get('message', 'N/A')}")
     return final_score
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main():
+    # ── validation ────────────────────────────────────────────────────────────
     if not OPENAI_API_KEY:
         print("ERROR: Set OPENAI_API_KEY (or HF_TOKEN) environment variable.")
         sys.exit(1)
 
-    tasks = list_tasks()
+    try:
+        tasks = list_tasks()
+    except Exception as exc:
+        print(f"ERROR: Failed to load tasks: {exc}")
+        traceback.print_exc()
+        sys.exit(1)
+
+    if not tasks:
+        print("ERROR: No tasks available in the environment.")
+        sys.exit(1)
+
+    # ── run all tasks ────────────────────────────────────────────────────────
     scores = {}
 
     for task_id in tasks:
-        score = run_task(task_id)
-        scores[task_id] = score
+        try:
+            score = run_task(task_id)
+            scores[task_id] = score
+        except Exception as exc:
+            print(f"ERROR: Unexpected error in run_task({task_id}): {exc}")
+            traceback.print_exc()
+            scores[task_id] = 0.0
 
+    # ── report results ───────────────────────────────────────────────────────
     print(f"\n{'='*60}")
     print("  BASELINE RESULTS")
     print(f"{'='*60}")
     for task_id, score in scores.items():
         bar = "█" * int(score * 20)
         print(f"  {task_id:<15} {score:.4f}  {bar}")
-    avg = sum(scores.values()) / len(scores)
+    avg = sum(scores.values()) / len(scores) if scores else 0.0
     print(f"  {'AVERAGE':<15} {avg:.4f}")
     print(f"{'='*60}\n")
 
